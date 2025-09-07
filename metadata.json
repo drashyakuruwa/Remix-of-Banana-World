@@ -1,0 +1,5 @@
+{
+  "name": "Remix of Banana World v0.1",
+  "description": "A canvas-based application where users can drag and drop images, which are converted to 3D voxel models using a customizable prompt. The generated images can be moved and regenerated on the canvas.",
+  "requestFramePermissions": []
+}
