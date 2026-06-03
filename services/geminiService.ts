@@ -14,143 +14,55 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 export const generateImageWithPrompt = async (imageFile: File, prompt: string): Promise<{ imageUrl: string | null; text: string | null; }> => {
-    if (!process.env.API_KEY) {
-        throw new Error("API_KEY environment variable not set. Please ensure it's configured.");
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
     const base64ImageData = await fileToBase64(imageFile);
     const mimeType = imageFile.type;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image-preview',
-        contents: {
-            parts: [
-                {
-                    inlineData: {
-                        data: base64ImageData,
-                        mimeType: mimeType,
-                    },
-                },
-                {
-                    text: prompt,
-                },
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
-        },
+    const res = await fetch('/api/gemini/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, base64ImageData, mimeType })
     });
-    
-    let imageUrl: string | null = null;
-    let text: string | null = null;
-    
-    if (response.candidates && response.candidates.length > 0) {
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData && part.inlineData.data) {
-                const base64ImageBytes: string = part.inlineData.data;
-                imageUrl = `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
-            } else if (part.text) {
-                text = part.text;
-            }
-        }
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Network error ' + res.status }));
+        throw new Error(err.error || `Failed to generate image: ${res.status}`);
     }
 
-    if (!imageUrl) {
-        throw new Error(text || "No image was generated in the API response.");
-    }
-
-    return { imageUrl, text };
+    return await res.json();
 };
 
-
 export const generateImageFromText = async (prompt: string): Promise<{ imageUrl: string | null; text: string | null; }> => {
-    if (!process.env.API_KEY) {
-        throw new Error("API_KEY environment variable not set. Please ensure it's configured.");
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image-preview',
-        contents: {
-            parts: [
-                {
-                    text: prompt,
-                },
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
-        },
+    const res = await fetch('/api/gemini/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
     });
-    
-    let imageUrl: string | null = null;
-    let text: string | null = null;
-    
-    if (response.candidates && response.candidates.length > 0) {
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData && part.inlineData.data) {
-                const base64ImageBytes: string = part.inlineData.data;
-                imageUrl = `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
-            } else if (part.text) {
-                text = part.text;
-            }
-        }
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Network error ' + res.status }));
+        throw new Error(err.error || `Failed to generate image: ${res.status}`);
     }
 
-    if (!imageUrl) {
-        throw new Error(text || "No image was generated in the API response.");
-    }
-
-    return { imageUrl, text };
+    return await res.json();
 };
 
 export const getRemixSuggestions = async (imageFile: File, prompt: string): Promise<string[]> => {
-    if (!process.env.API_KEY) {
-        throw new Error("API_KEY environment variable not set. Please ensure it's configured.");
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const base64ImageData = await fileToBase64(imageFile);
-
-    const textPart = { text: prompt };
-    const imagePart = {
-        inlineData: {
-            mimeType: imageFile.type,
-            data: base64ImageData,
-        },
-    };
+    const mimeType = imageFile.type;
 
     try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: { parts: [textPart, imagePart] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        prompts: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.STRING,
-                                description: "A short remix prompt idea."
-                            }
-                        }
-                    },
-                    required: ["prompts"]
-                }
-            }
+        const res = await fetch('/api/gemini/remix-suggestions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, base64ImageData, mimeType })
         });
-
-        const jsonText = response.text.trim();
-        const result = JSON.parse(jsonText);
         
-        if (result.prompts && Array.isArray(result.prompts) && result.prompts.length > 0) {
-            return result.prompts.slice(0, 5); // Ensure we only return 5
-        }
-        return [];
+        if (!res.ok) return [];
+
+        const result = await res.json();
+        return result.prompts || [];
     } catch (error) {
         console.error("Error getting remix suggestions:", error);
-        return []; // Return empty array on failure
+        return [];
     }
 };
