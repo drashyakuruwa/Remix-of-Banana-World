@@ -233,7 +233,7 @@ const App: React.FC = () => {
 
   // Effect for render complete sound
   useEffect(() => {
-    const prevImagesMap = new Map(prevImagesRef.current.map(img => [img.id, img]));
+    const prevImagesMap = new Map<number, ProcessedImage>(prevImagesRef.current.map(img => [img.id, img] as [number, ProcessedImage]));
 
     images.forEach(img => {
         const prevImg = prevImagesMap.get(img.id);
@@ -275,14 +275,14 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    const prevUrls = new Set(prevImagesRef.current.map(i => i.sourcePreviewUrl).filter(Boolean));
-    const currentUrls = new Set(images.map(i => i.sourcePreviewUrl).filter(Boolean));
+    const prevUrls = new Set<string>(prevImagesRef.current.map(i => i.sourcePreviewUrl).filter((url): url is string => Boolean(url)));
+    const currentUrls = new Set<string>(images.map(i => i.sourcePreviewUrl).filter((url): url is string => Boolean(url)));
 
     prevUrls.forEach(url => {
       // only revoke blob URLs, not data URLs
       if (url && url.startsWith('blob:') && !currentUrls.has(url)) {
         URL.revokeObjectURL(url);
-        const entry = Object.entries(previewImageCache.current).find(([, img]) => img.src === url);
+        const entry = Object.entries(previewImageCache.current).find(([, img]) => (img as HTMLImageElement).src === url);
         if (entry) {
           delete previewImageCache.current[parseInt(entry[0], 10)];
         }
